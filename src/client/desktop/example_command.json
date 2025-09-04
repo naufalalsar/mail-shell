@@ -1,0 +1,6 @@
+{
+  "command": "echo Hello World",
+  "time_sent": "2025-09-02T18:51:00Z",
+  "sequence_number": 1,
+  "server_number": 1
+}
