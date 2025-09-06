@@ -8,6 +8,10 @@ import imaplib
 import email
 import csv
 import uuid
+import base64
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto.Random import get_random_bytes
 
 # --- Load environment variables from .env file ---
 load_dotenv()
@@ -17,6 +21,10 @@ USERNAME = os.getenv("EMAIL_USERNAME")
 PASSWORD = os.getenv("EMAIL_PASSWORD")
 SMTP_SERVER = os.getenv("SMTP_SERVER")
 IMAP_SERVER = os.getenv("EMAIL_SERVER")
+
+# --- Encryption Configuration ---
+SERVER_PUBLIC_KEY_PATH = os.getenv("SERVER_PUBLIC_KEY_PATH", "server_public.pem")
+CLIENT_PRIVATE_KEY_PATH = os.getenv("CLIENT_PRIVATE_KEY_PATH", "client_private.pem")
 
 # --- Log File Configuration ---
 LOGS_DIR = "logs"
@@ -49,9 +57,9 @@ def log_to_txt(filepath, json_payload):
     with open(filepath, 'w') as f:
         f.write(json_payload)
 
-def send_command_email():
-    """Guides the user to send a new plaintext command email and logs the action."""
-    print("\n--- Send New Command (Unencrypted) ---")
+def send_command_email(rsa_cipher):
+    """Guides the user to send a new encrypted command email and logs the action."""
+    print("\n--- Send New Command ---")
     command = input("Enter command to send: ")
     while True:
         server_str = input("Enter target server number: ")
@@ -64,13 +72,29 @@ def send_command_email():
     command_uuid = str(uuid.uuid4())
     print(f"Generated new command UUID: {command_uuid}")
 
-    command_data = {
+    inner_command_data = {
         "command": command,
         "time_sent": datetime.now().isoformat(),
-        "uuid": command_uuid,
         "server_number": server_number
     }
-    json_payload_to_send = json.dumps(command_data, indent=2)
+
+    print("Encrypting command payload using hybrid encryption (AES+RSA)...")
+    inner_payload_bytes = json.dumps(inner_command_data).encode('utf-8')
+
+    session_key = get_random_bytes(16)
+    cipher_aes = AES.new(session_key, AES.MODE_EAX)
+    ciphertext, tag = cipher_aes.encrypt_and_digest(inner_payload_bytes)
+    encrypted_session_key = rsa_cipher.encrypt(session_key)
+
+    final_payload_data = {
+        "uuid": command_uuid,
+        "encrypted_session_key": base64.b64encode(encrypted_session_key).decode('utf-8'),
+        "nonce": base64.b64encode(cipher_aes.nonce).decode('utf-8'),
+        "tag": base64.b64encode(tag).decode('utf-8'),
+        "ciphertext": base64.b64encode(ciphertext).decode('utf-8')
+    }
+    
+    json_payload_to_send = json.dumps(final_payload_data, indent=2)
 
     msg = EmailMessage()
     msg['Subject'] = "MAIL SHELL"
@@ -85,7 +109,10 @@ def send_command_email():
             server.send_message(msg)
         print("\nCommand email sent successfully!")
         
-        log_to_csv(SENT_CSV_LOG, command_data, ["uuid", "command", "server_number", "time_sent"])
+        log_data = inner_command_data
+        log_data['uuid'] = command_uuid
+        log_to_csv(SENT_CSV_LOG, log_data, ["uuid", "command", "server_number", "time_sent"])
+        
         log_file_path = os.path.join(SENT_LOGS_DIR, f"sent_{command_uuid}.txt")
         log_to_txt(log_file_path, json_payload_to_send)
         print(f"Sent command logged to {SENT_CSV_LOG} and {log_file_path}")
@@ -106,8 +133,8 @@ def load_processed_replies():
         pass
     return processed
 
-def sync_replies():
-    """Connects to the server, fetches plaintext replies, and logs new ones."""
+def sync_replies(rsa_cipher):
+    """Connects to the server, fetches encrypted replies, decrypts them, and logs new ones."""
     print("\n--- Syncing Replies ---")
     processed_replies = load_processed_replies()
     print(f"Found {len(processed_replies)} replies already logged locally.")
@@ -142,12 +169,38 @@ def sync_replies():
                 data = json.loads(body)
                 command_uuid = data.get("uuid")
                 if command_uuid and command_uuid not in processed_replies:
-                    reply_json_string = json.dumps(data, indent=2)
-                    log_to_csv(REPLY_CSV_LOG, data, ["uuid", "command", "time_replied", "status"])
-                    log_file_path = os.path.join(REPLY_LOGS_DIR, f"reply_{command_uuid}.txt")
-                    log_to_txt(log_file_path, reply_json_string)
-                    processed_replies.add(command_uuid)
-                    replies_synced += 1
+                    try:
+                        encrypted_session_key = base64.b64decode(data['encrypted_session_key'])
+                        nonce = base64.b64decode(data['nonce'])
+                        tag = base64.b64decode(data['tag'])
+                        ciphertext = base64.b64decode(data['ciphertext'])
+
+                        session_key = rsa_cipher.decrypt(encrypted_session_key)
+
+                        cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+                        decrypted_bytes = cipher_aes.decrypt_and_verify(ciphertext, tag)
+                        
+                        decrypted_data = json.loads(decrypted_bytes.decode('utf-8'))
+                        
+                        # --- MODIFICATION ---
+                        # Add a status to the successfully decrypted data before logging
+                        data_to_log = decrypted_data
+                        data_to_log['status'] = 'success' 
+                        
+                        reply_json_string = json.dumps(data_to_log, indent=2)
+                        log_to_csv(REPLY_CSV_LOG, data_to_log, ["uuid", "command", "time_replied", "status"])
+                        log_file_path = os.path.join(REPLY_LOGS_DIR, f"reply_{command_uuid}.txt")
+                        log_to_txt(log_file_path, reply_json_string)
+                        processed_replies.add(command_uuid)
+                        replies_synced += 1
+                    except Exception as e:
+                        print(f"DECRYPTION FAILED for reply with UUID {command_uuid[:8]}. Logging as failed. Error: {e}")
+                        failure_data = {"uuid": command_uuid, "command": "DECRYPTION_FAILED", "time_replied": datetime.now().isoformat(), "status": "failed"}
+                        log_to_csv(REPLY_CSV_LOG, failure_data, ["uuid", "command", "time_replied", "status"])
+                        processed_replies.add(command_uuid)
+                        replies_synced += 1
+                        continue
+
             except (json.JSONDecodeError, AttributeError):
                 continue
         
@@ -234,19 +287,19 @@ def display_log_details(uuid_to_find):
     if not log_found:
         print(f"No detailed .txt logs found for UUID {uuid_to_find}.")
 
-def interactive_mode():
+def interactive_mode(send_cipher, reply_cipher):
     """Runs the main interactive command prompt."""
     setup_logging()
-    print("--- Mail Commander (Unencrypted Mode) ---")
+    print("--- Mail Commander (Secure Mode) ---")
     
     while True:
         print("\nAvailable actions: [send], [sync] replies, [read] logs, [quit]")
         action = input("Enter action: ").lower()
 
         if action == 'send':
-            send_command_email()
+            send_command_email(send_cipher)
         elif action == 'sync':
-            sync_replies()
+            sync_replies(reply_cipher)
         elif action == 'read':
             view_logs_paginated()
         elif action == 'quit':
@@ -258,4 +311,21 @@ if __name__ == "__main__":
     if not all([USERNAME, PASSWORD, SMTP_SERVER, IMAP_SERVER]):
         print("Error: Ensure .env file has all required client variables.")
     else:
-        interactive_mode()
+        print("Encryption is REQUIRED for this script.")
+        try:
+            public_key = RSA.import_key(open(SERVER_PUBLIC_KEY_PATH).read())
+            send_rsa_cipher = PKCS1_OAEP.new(public_key)
+            print(f"Server public key loaded from {SERVER_PUBLIC_KEY_PATH}.")
+        except FileNotFoundError:
+            print(f"FATAL ERROR: Server public key not found at '{SERVER_PUBLIC_KEY_PATH}'.")
+            exit()
+        
+        reply_rsa_cipher = None
+        try:
+            private_key = RSA.import_key(open(CLIENT_PRIVATE_KEY_PATH).read())
+            reply_rsa_cipher = PKCS1_OAEP.new(private_key)
+            print(f"Client private key loaded from {CLIENT_PRIVATE_KEY_PATH}.")
+        except FileNotFoundError:
+            print(f"WARNING: Client private key not found at '{CLIENT_PRIVATE_KEY_PATH}'. Cannot decrypt replies.")
+
+        interactive_mode(send_rsa_cipher, reply_rsa_cipher)
