@@ -1,0 +1,10 @@
+{
+  "uuid": "cf335fd9-7b10-4f8e-8858-816f358056a4",
+  "encrypted_session_key": "x7bdo9GO0yXzzb3ZcfOX1tfJbZ3KpcieQICE2MbuJ/L8mlGiAsV8pEY6DQH17QsL/Vcv3QGsqH7YdPFhZgtLFCZsvO/XKOkhV/tMsiNWel0oUWVC6WFwUgzreskSu1ye4xmuC2z9hWdxhvJp6uo/24DYjJQxX5aq1Nc0LmUwl9HaCjZMO0pzDQyei2BGPASB5PlY6ZaawC8st1AiM5cX7tOPRkvu784Nd6xQJm7OmfgS8WgvfzNdEixde7iJcshMLEnu50JKJeyv1miEQ5CbqTLpxUEl7d2yeCAhekYH1+/PK2JETqMWyGpLTkBObKAm1gF6FHp2bZ0SPNoQNJsG8Q==",
+  "nonce": "5Vdy0uFVx+QcS500hkxWag==",
+  "tag": "roWVT6P5fHEbQ6YXJDH23w==",
+  "ciphertext": "4Ovzntb6vAC6V7dWRe/4wijxODpT9PRrF7e44y9+xiGTo/KNnYotCeR7E9gr4StiTuZ1/CNwabUhlrwN7NY7q088k5DhMZkVDHVGyBvuQGnx",
+  "signature": "I6ety/wYkEv/TgnUBAT3ipDGfsOBbQ122bZhiuWTTG7zlTvl13AEYMhl0jCSdk5XkVMpoNCgQ7QrTLUA3CXAEDCDvXbHWPZaotRB/bH0rSAYhJZ8tD171QOCuBNGMQngeRiGOV52/KPfdIQbH7mzNUZni9xl88uOJrDYubKTcEie35uLshLR690yWdTPyWTrgXhOYhUY0hD29F7eO3M6tq5FHA7Q4eZfVwCXJnpR5Fn3VbChCu+CzIYvGn/HGIsL4SeT37zqfWXJy5Sn3zw+InTMPZnofWUU8V4YrDhPoJapEcgzICAmKLFEEq1KH8ga22df5Rz9bH8jEhyGEcTsqQ==",
+  "server_number": 1,
+  "client_number": 1
+}

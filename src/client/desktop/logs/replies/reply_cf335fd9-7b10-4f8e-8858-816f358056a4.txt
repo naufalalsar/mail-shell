@@ -1,0 +1,41 @@
+{
+  "command": "ipconfig",
+  "command_reply": "Windows IP Configuration\n\n\nEthernet adapter Ethernet 3:\n\n   Connection-specific DNS Suffix  . : \n   IPv6 Address. . . . . . . . . . . : 2400:9800:6032:5e8b:7aec:c3c4:605f:bbb4\n   Temporary IPv6 Address. . . . . . : 2400:9800:6032:5e8b:24fc:7654:a3a1:48c3\n   Temporary IPv6 Address. . . . . . : 2400:9800:6032:5e8b:950d:462a:b919:9bda\n   Link-local IPv6 Address . . . . . : fe80::17d1:6b53:8b1f:557a%22\n   IPv4 Address. . . . . . . . . . . : 192.168.100.47\n   Subnet Mask . . . . . . . . . . . : 255.255.255.0\n   Default Gateway . . . . . . . . . : fe80::1%22\n                                       192.168.100.1\n\nWireless LAN adapter Local Area Connection* 1:\n\n   Media State . . . . . . . . . . . : Media disconnected\n   Connection-specific DNS Suffix  . : \n\nWireless LAN adapter Local Area Connection* 10:\n\n   Media State . . . . . . . . . . . : Media disconnected\n   Connection-specific DNS Suffix  . : \n\nWireless LAN adapter Wi-Fi 2:\n\n   Media State . . . . . . . . . . . : Media disconnected\n   Connection-specific DNS Suffix  . :",
+  "server_number": 1,
+  "time_replied": "2025-09-11T16:37:56.310279",
+  "time_sent": "2025-09-11T16:37:37.297572",
+  "uuid": "cf335fd9-7b10-4f8e-8858-816f358056a4",
+  "status": "success"
+}
+
+Command Reply :
+
+Windows IP Configuration
+
+
+Ethernet adapter Ethernet 3:
+
+   Connection-specific DNS Suffix  . : 
+   IPv6 Address. . . . . . . . . . . : 2400:9800:6032:5e8b:7aec:c3c4:605f:bbb4
+   Temporary IPv6 Address. . . . . . : 2400:9800:6032:5e8b:24fc:7654:a3a1:48c3
+   Temporary IPv6 Address. . . . . . : 2400:9800:6032:5e8b:950d:462a:b919:9bda
+   Link-local IPv6 Address . . . . . : fe80::17d1:6b53:8b1f:557a%22
+   IPv4 Address. . . . . . . . . . . : 192.168.100.47
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : fe80::1%22
+                                       192.168.100.1
+
+Wireless LAN adapter Local Area Connection* 1:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : 
+
+Wireless LAN adapter Local Area Connection* 10:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : 
+
+Wireless LAN adapter Wi-Fi 2:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . :

@@ -1,0 +1,37 @@
+[2025-09-11 16:37:56] Verifying signature from client #1...
+[2025-09-11 16:37:56] Signature VERIFIED.
+[2025-09-11 16:37:56] Executing command: 'ipconfig'
+[2025-09-11 16:37:56] Command output captured.
+[2025-09-11 16:37:56] Output : 
+ Windows IP Configuration
+
+
+Ethernet adapter Ethernet 3:
+
+   Connection-specific DNS Suffix  . : 
+   IPv6 Address. . . . . . . . . . . : 2400:9800:6032:5e8b:7aec:c3c4:605f:bbb4
+   Temporary IPv6 Address. . . . . . : 2400:9800:6032:5e8b:24fc:7654:a3a1:48c3
+   Temporary IPv6 Address. . . . . . : 2400:9800:6032:5e8b:950d:462a:b919:9bda
+   Link-local IPv6 Address . . . . . : fe80::17d1:6b53:8b1f:557a%22
+   IPv4 Address. . . . . . . . . . . : 192.168.100.47
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : fe80::1%22
+                                       192.168.100.1
+
+Wireless LAN adapter Local Area Connection* 1:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : 
+
+Wireless LAN adapter Local Area Connection* 10:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . : 
+
+Wireless LAN adapter Wi-Fi 2:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix  . :
+[2025-09-11 16:37:56] Encrypting reply...
+[2025-09-11 16:37:56] Signing reply...
+[2025-09-11 16:37:58] Successfully sent signed and encrypted reply.

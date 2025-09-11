@@ -117,20 +117,18 @@ def send_reply_email(original_data, command_output, rsa_cipher, signing_key):
             "ciphertext": base64.b64encode(ciphertext).decode('utf-8')
         }
 
-        # --- MODIFICATION: Sign the encrypted block, not the plaintext ---
-        log_command_activity(command_uuid, "Signing encrypted reply payload...")
-        payload_to_sign_bytes = json.dumps(encrypted_block, separators=(',', ':'), sort_keys=True).encode('utf-8')
+        log_command_activity(command_uuid, "Signing reply...")
+        payload_to_sign = { "uuid": command_uuid, **encrypted_block }
+        payload_to_sign_bytes = json.dumps(payload_to_sign, separators=(',', ':'), sort_keys=True).encode('utf-8')
         hash_obj = SHA256.new(payload_to_sign_bytes)
         signature = signing_key.sign(hash_obj)
         
         final_payload_to_send = {
-            "uuid": command_uuid,
-            **encrypted_block,
+            **payload_to_sign,
             "signature": base64.b64encode(signature).decode('utf-8'),
             "server_number": int(SERVER_NUMBER),
             "client_number": original_data.get("client_number")
         }
-
         reply_json_string = json.dumps(final_payload_to_send, indent=2)
         
         msg = EmailMessage()
@@ -147,18 +145,13 @@ def send_reply_email(original_data, command_output, rsa_cipher, signing_key):
         log_command_activity(command_uuid, f"Failed to send reply email. Error: {e}")
 
 def execute_command(command_string, command_uuid):
-    """
-    Executes a command and returns its output as a single string.
-    """
     try:
         log_command_activity(command_uuid, f"Executing command: '{command_string}'")
         result = subprocess.run(command_string, shell=True, capture_output=True, text=True)
-        
         output = result.stdout.strip()
         if result.stderr:
             output += f"\n--- STDERR ---\n{result.stderr.strip()}"
-            
-        log_command_activity(command_uuid, f"Command output captured.")
+        log_command_activity(command_uuid, "Command output captured.")
         log_command_activity(command_uuid, f"Output : \n {output}")
         return output
     except Exception as e:
@@ -209,12 +202,15 @@ def check_emails(processed_uuids, decrypt_cipher, trusted_clients, signing_key):
                         log_command_activity(command_uuid, f"Verifying signature from client #{client_number}...")
                         signature = base64.b64decode(outer_data['signature'])
                         
-                        encrypted_inner_payload = {
+                        # --- MODIFICATION: The signature now covers the UUID ---
+                        payload_to_verify = {
+                            "uuid": command_uuid,
                             "encrypted_session_key": outer_data["encrypted_session_key"],
                             "nonce": outer_data["nonce"], "tag": outer_data["tag"],
                             "ciphertext": outer_data["ciphertext"]
                         }
-                        payload_to_verify_bytes = json.dumps(encrypted_inner_payload, separators=(',', ':'), sort_keys=True).encode('utf-8')
+
+                        payload_to_verify_bytes = json.dumps(payload_to_verify, separators=(',', ':'), sort_keys=True).encode('utf-8')
                         hash_obj = SHA256.new(payload_to_verify_bytes)
                         
                         verifier = trusted_clients[client_number][1]
@@ -292,3 +288,4 @@ if __name__ == "__main__":
             wait_time = 15 * 60
             print(f"--- Check complete. Waiting for {wait_time / 60} minutes... ---")
             time.sleep(wait_time)
+

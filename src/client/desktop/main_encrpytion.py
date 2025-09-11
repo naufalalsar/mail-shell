@@ -82,10 +82,9 @@ def log_to_csv(filepath, data, headers):
         writer = csv.writer(f)
         writer.writerow([data.get(h, 'N/A') for h in headers])
 
-def log_to_txt(filepath, content):
-    """Saves the given content string to a text file."""
+def log_to_txt(filepath, json_payload):
     with open(filepath, 'w') as f:
-        f.write(content)
+        f.write(json_payload)
 
 def send_command_email(server_keys, signing_key):
     print("\n--- Send New Command ---")
@@ -125,14 +124,15 @@ def send_command_email(server_keys, signing_key):
         "ciphertext": base64.b64encode(ciphertext).decode('utf-8')
     }
 
-    print("Signing encrypted payload...")
-    payload_to_sign_bytes = json.dumps(encrypted_block, separators=(',', ':'), sort_keys=True).encode('utf-8')
+    print("Signing canonical payload (UUID + encrypted block)...")
+    # --- MODIFICATION: The signature now covers the UUID ---
+    payload_to_sign = { "uuid": command_uuid, **encrypted_block }
+    payload_to_sign_bytes = json.dumps(payload_to_sign, separators=(',', ':'), sort_keys=True).encode('utf-8')
     hash_obj = SHA256.new(payload_to_sign_bytes)
     signature = signing_key.sign(hash_obj)
 
     final_payload_data = {
-        "uuid": command_uuid,
-        **encrypted_block,
+        **payload_to_sign,
         "signature": base64.b64encode(signature).decode('utf-8'),
         "server_number": server_id,
         "client_number": int(CLIENT_NUMBER)
@@ -191,7 +191,7 @@ def sync_replies(reply_cipher, server_keys):
         email_ids = messages[0].split()
 
         if not email_ids:
-            print("No replies found on the server.")
+            print("No new replies found on the server.")
             mail.logout()
             return
 
@@ -219,18 +219,22 @@ def sync_replies(reply_cipher, server_keys):
                         continue
                     
                     try:
+                        # --- VERIFY SIGNATURE ---
                         signature = base64.b64decode(outer_data['signature'])
                         encrypted_block = {
                             "encrypted_session_key": outer_data["encrypted_session_key"],
                             "nonce": outer_data["nonce"], "tag": outer_data["tag"],
                             "ciphertext": outer_data["ciphertext"]
                         }
-                        payload_to_verify_bytes = json.dumps(encrypted_block, separators=(',', ':'), sort_keys=True).encode('utf-8')
+                        # --- MODIFICATION: The signature now covers the UUID ---
+                        payload_to_verify = { "uuid": command_uuid, **encrypted_block }
+                        payload_to_verify_bytes = json.dumps(payload_to_verify, separators=(',', ':'), sort_keys=True).encode('utf-8')
                         hash_obj = SHA256.new(payload_to_verify_bytes)
                         verifier = server_keys[server_number][1]
                         verifier.verify(hash_obj, signature)
                         print(f"Signature VERIFIED for reply from server #{server_number}.")
 
+                        # --- DECRYPT PAYLOAD ---
                         encrypted_key = base64.b64decode(outer_data['encrypted_session_key'])
                         session_key = reply_cipher.decrypt(encrypted_key)
                         nonce = base64.b64decode(outer_data['nonce'])
@@ -242,9 +246,8 @@ def sync_replies(reply_cipher, server_keys):
                         data_to_log = decrypted_data
                         data_to_log['status'] = 'success'
                         
-                        # --- MODIFICATION: Create the enhanced log format ---
                         raw_json_for_log = json.dumps(data_to_log, indent=2)
-                        command_reply_content = data_to_log.get("command_reply", "No reply content found in JSON.")
+                        command_reply_content = data_to_log.get("command_reply", "No reply content found.")
                         final_log_output = f"{raw_json_for_log}\n\nCommand Reply :\n\n{command_reply_content}"
                         
                         log_to_csv(REPLY_CSV_LOG, data_to_log, ["uuid", "command", "time_replied", "status"])
