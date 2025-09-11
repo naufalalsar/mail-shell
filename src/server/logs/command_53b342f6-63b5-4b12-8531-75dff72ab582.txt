@@ -1,0 +1,4 @@
+[2025-09-11 13:40:30] Executing command: 'ver'
+[2025-09-11 13:40:30] Command output captured with 1 lines.
+[2025-09-11 13:40:30] Encrypting reply...
+[2025-09-11 13:40:32] Successfully sent hybrid encrypted reply.

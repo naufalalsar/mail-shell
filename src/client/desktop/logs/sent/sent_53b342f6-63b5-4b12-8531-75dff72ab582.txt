@@ -1,0 +1,9 @@
+{
+  "uuid": "53b342f6-63b5-4b12-8531-75dff72ab582",
+  "encrypted_session_key": "EXymdZnT7wGjEnNYRilMlWOEGDmUYxNR9TR34sEYeTgbv18xtDvKds4cU756BSS5wwvopmeig0MphdeSU/Q+tc5jLTKJgsTa1fy8vZBWsL/tGsBBaAfDDYHQRSNHh7h6nLv8JfakrlRNHYWJ1GqU1RJoy9IiYDINFWKSaDadhJQ5T7fwAUHMTRFiGARlt/2KALc5MMJZ65oj4Y/Em8BmYlXi7RFFbl45T0ouuyJcqZzot0L1dt8nGU/qJFkmgLic2S4qJhTx2WBT6/HbTJR8pnOddI2AYAdu8BurMzvRwcnu7EGhrZgk84AmLpDEyC4syG1hHewTs1X0dklCzBKenw==",
+  "nonce": "8fSGBEbzecIDIfOFghx8KQ==",
+  "tag": "lfPcoc03za8d9P9AfFCa1A==",
+  "ciphertext": "NLFnqlRu/uamVoCore3/BuHCXuiglT6wrCwlHLYS68J6QPuk2eCbB+Wn/+kRSwrhxWeuiTpsQSTYifcoMy15B1RV6HxVsMLs5TrHiRzweBq2",
+  "server_number": 1,
+  "client_number": 1
+}
