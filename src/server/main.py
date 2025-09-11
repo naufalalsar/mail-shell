@@ -112,6 +112,7 @@ def check_emails(processed_uuids):
 
         if email_ids:
             for email_id in email_ids:
+
                 status, msg_data = mail.fetch(email_id, "(RFC822)")
                 msg = email.message_from_bytes(msg_data[0][1])
                 

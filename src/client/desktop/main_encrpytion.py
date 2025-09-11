@@ -11,6 +11,8 @@ import uuid
 import base64
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
 
 # --- Load environment variables from .env file ---
@@ -21,11 +23,11 @@ USERNAME = os.getenv("EMAIL_USERNAME")
 PASSWORD = os.getenv("EMAIL_PASSWORD")
 SMTP_SERVER = os.getenv("SMTP_SERVER")
 IMAP_SERVER = os.getenv("EMAIL_SERVER")
-CLIENT_NUMBER = os.getenv("CLIENT_NUMBER") # This client's unique ID (e.g., "1")
+CLIENT_NUMBER = os.getenv("CLIENT_NUMBER")
 
-# --- Encryption Configuration (Hardcoded Paths) ---
+# --- Encryption Configuration ---
 SERVER_KEYS_DIR = "server_keys"
-CLIENT_PRIVATE_KEY_PATH = f"{CLIENT_NUMBER}_private.pem"
+CLIENT_PRIVATE_KEY_PATH = f"{CLIENT_NUMBER}_private.pem" if CLIENT_NUMBER else None
 
 # --- Log File Configuration ---
 LOGS_DIR = "logs"
@@ -35,12 +37,15 @@ SENT_CSV_LOG = os.path.join(SENT_LOGS_DIR, "sent_commands.csv")
 REPLY_CSV_LOG = os.path.join(REPLY_LOGS_DIR, "received_replies.csv")
 
 def load_server_public_keys():
-    """Loads server public keys, mapping filenames like "1.pem" to integer ID 1."""
+    """
+    Loads server public keys, creating both an encryption cipher and a signature verifier.
+    Returns a dictionary mapping server_number to a tuple of (encrypt_cipher, signature_verifier).
+    """
     keys = {}
     print(f"Loading server public keys from '{SERVER_KEYS_DIR}'...")
     try:
         if not os.path.isdir(SERVER_KEYS_DIR):
-            print(f"Warning: Directory '{SERVER_KEYS_DIR}' not found. Cannot send commands.")
+            print(f"Warning: Directory '{SERVER_KEYS_DIR}' not found.")
             return {}
         for filename in os.listdir(SERVER_KEYS_DIR):
             if filename.endswith(".pem"):
@@ -49,8 +54,10 @@ def load_server_public_keys():
                 try:
                     server_id = int(server_id_str)
                     public_key = RSA.import_key(open(filepath).read())
-                    keys[server_id] = PKCS1_OAEP.new(public_key)
-                    print(f"  - Loaded key for server ID: {server_id}")
+                    encrypt_cipher = PKCS1_OAEP.new(public_key)
+                    signature_verifier = pkcs1_15.new(public_key)
+                    keys[server_id] = (encrypt_cipher, signature_verifier)
+                    print(f"  - Loaded key and verifier for server ID: {server_id}")
                 except (ValueError, Exception) as e:
                     print(f"  - Failed to load key from {filename}. Error: {e}")
         return keys
@@ -75,11 +82,12 @@ def log_to_csv(filepath, data, headers):
         writer = csv.writer(f)
         writer.writerow([data.get(h, 'N/A') for h in headers])
 
-def log_to_txt(filepath, json_payload):
+def log_to_txt(filepath, content):
+    """Saves the given content string to a text file."""
     with open(filepath, 'w') as f:
-        f.write(json_payload)
+        f.write(content)
 
-def send_command_email(server_keys):
+def send_command_email(server_keys, signing_key):
     print("\n--- Send New Command ---")
     command = input("Enter command to send: ")
     while True:
@@ -89,11 +97,11 @@ def send_command_email(server_keys):
             if server_id in server_keys:
                 break
             else:
-                print("Invalid server ID. Please choose from the available keys.")
+                print("Invalid server ID.")
         except ValueError:
             print("Invalid input. Please enter a number.")
     
-    rsa_cipher = server_keys[server_id]
+    rsa_cipher = server_keys[server_id][0]
     command_uuid = str(uuid.uuid4())
     print(f"Generated new command UUID: {command_uuid}")
 
@@ -103,19 +111,29 @@ def send_command_email(server_keys):
         "client_number": int(CLIENT_NUMBER)
     }
 
-    print("Encrypting command payload using hybrid encryption...")
-    inner_payload_bytes = json.dumps(inner_command_data).encode('utf-8')
+    print("Encrypting command payload...")
+    inner_payload_bytes = json.dumps(inner_command_data, separators=(',', ':'), sort_keys=True).encode('utf-8')
     session_key = get_random_bytes(16)
     cipher_aes = AES.new(session_key, AES.MODE_EAX)
     ciphertext, tag = cipher_aes.encrypt_and_digest(inner_payload_bytes)
     encrypted_session_key = rsa_cipher.encrypt(session_key)
 
-    final_payload_data = {
-        "uuid": command_uuid,
+    encrypted_block = {
         "encrypted_session_key": base64.b64encode(encrypted_session_key).decode('utf-8'),
         "nonce": base64.b64encode(cipher_aes.nonce).decode('utf-8'),
         "tag": base64.b64encode(tag).decode('utf-8'),
-        "ciphertext": base64.b64encode(ciphertext).decode('utf-8'),
+        "ciphertext": base64.b64encode(ciphertext).decode('utf-8')
+    }
+
+    print("Signing encrypted payload...")
+    payload_to_sign_bytes = json.dumps(encrypted_block, separators=(',', ':'), sort_keys=True).encode('utf-8')
+    hash_obj = SHA256.new(payload_to_sign_bytes)
+    signature = signing_key.sign(hash_obj)
+
+    final_payload_data = {
+        "uuid": command_uuid,
+        **encrypted_block,
+        "signature": base64.b64encode(signature).decode('utf-8'),
         "server_number": server_id,
         "client_number": int(CLIENT_NUMBER)
     }
@@ -136,8 +154,7 @@ def send_command_email(server_keys):
         print("\nCommand email sent successfully!")
         
         log_data = inner_command_data
-        log_data['uuid'] = command_uuid
-        log_data['server_number'] = server_id
+        log_data.update({'uuid': command_uuid, 'server_number': server_id})
         log_to_csv(SENT_CSV_LOG, log_data, ["uuid", "command", "server_number", "time_sent", "client_number"])
         
         log_file_path = os.path.join(SENT_LOGS_DIR, f"sent_{command_uuid}.txt")
@@ -159,7 +176,7 @@ def load_processed_replies():
         pass
     return processed
 
-def sync_replies(rsa_cipher):
+def sync_replies(reply_cipher, server_keys):
     print("\n--- Syncing Replies ---")
     processed_replies = load_processed_replies()
     print(f"Found {len(processed_replies)} replies already logged locally.")
@@ -191,30 +208,57 @@ def sync_replies(rsa_cipher):
                 body = msg.get_payload(decode=True).decode()
             
             try:
-                data = json.loads(body)
-                command_uuid = data.get("uuid")
+                outer_data = json.loads(body)
+                command_uuid = outer_data.get("uuid")
                 if command_uuid and command_uuid not in processed_replies:
-                    if str(data.get("client_number")) != CLIENT_NUMBER:
-                        continue 
+                    if str(outer_data.get("client_number")) != CLIENT_NUMBER: continue 
 
+                    server_number = outer_data.get("server_number")
+                    if not server_number or server_number not in server_keys:
+                        print(f"Warning: Received reply from unknown server #{server_number}. Skipping.")
+                        continue
+                    
                     try:
-                        encrypted_key = base64.b64decode(data['encrypted_session_key'])
-                        session_key = rsa_cipher.decrypt(encrypted_key)
-                        nonce = base64.b64decode(data['nonce'])
-                        tag = base64.b64decode(data['tag'])
-                        ciphertext = base64.b64decode(data['ciphertext'])
+                        signature = base64.b64decode(outer_data['signature'])
+                        encrypted_block = {
+                            "encrypted_session_key": outer_data["encrypted_session_key"],
+                            "nonce": outer_data["nonce"], "tag": outer_data["tag"],
+                            "ciphertext": outer_data["ciphertext"]
+                        }
+                        payload_to_verify_bytes = json.dumps(encrypted_block, separators=(',', ':'), sort_keys=True).encode('utf-8')
+                        hash_obj = SHA256.new(payload_to_verify_bytes)
+                        verifier = server_keys[server_number][1]
+                        verifier.verify(hash_obj, signature)
+                        print(f"Signature VERIFIED for reply from server #{server_number}.")
+
+                        encrypted_key = base64.b64decode(outer_data['encrypted_session_key'])
+                        session_key = reply_cipher.decrypt(encrypted_key)
+                        nonce = base64.b64decode(outer_data['nonce'])
+                        tag = base64.b64decode(outer_data['tag'])
+                        ciphertext = base64.b64decode(outer_data['ciphertext'])
                         cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
                         decrypted_bytes = cipher_aes.decrypt_and_verify(ciphertext, tag)
                         decrypted_data = json.loads(decrypted_bytes.decode('utf-8'))
                         data_to_log = decrypted_data
                         data_to_log['status'] = 'success'
                         
-                        reply_json_string = json.dumps(data_to_log, indent=2)
+                        # --- MODIFICATION: Create the enhanced log format ---
+                        raw_json_for_log = json.dumps(data_to_log, indent=2)
+                        command_reply_content = data_to_log.get("command_reply", "No reply content found in JSON.")
+                        final_log_output = f"{raw_json_for_log}\n\nCommand Reply :\n\n{command_reply_content}"
+                        
                         log_to_csv(REPLY_CSV_LOG, data_to_log, ["uuid", "command", "time_replied", "status"])
                         log_file_path = os.path.join(REPLY_LOGS_DIR, f"reply_{command_uuid}.txt")
-                        log_to_txt(log_file_path, reply_json_string)
+                        log_to_txt(log_file_path, final_log_output)
                         processed_replies.add(command_uuid)
                         replies_synced += 1
+                    except (ValueError, TypeError, KeyError) as e:
+                        print(f"SIGNATURE VERIFICATION FAILED for reply with UUID {command_uuid[:8]}. Error: {e}")
+                        failure_data = {"uuid": command_uuid, "command": "INVALID_SIGNATURE", "status": "failed"}
+                        log_to_csv(REPLY_CSV_LOG, failure_data, ["uuid", "command", "time_replied", "status"])
+                        processed_replies.add(command_uuid)
+                        replies_synced += 1
+                        continue
                     except Exception as e:
                         print(f"DECRYPTION FAILED for reply with UUID {command_uuid[:8]}. Error: {e}")
                         failure_data = {"uuid": command_uuid, "command": "DECRYPTION_FAILED", "status": "failed"}
@@ -289,7 +333,7 @@ def display_log_details(uuid_to_find):
     if not os.path.exists(sent_log_path) and not os.path.exists(reply_log_path):
         print(f"No detailed .txt logs found for UUID {uuid_to_find}.")
 
-def interactive_mode(server_keys, reply_cipher):
+def interactive_mode(server_keys, reply_cipher, signing_key):
     setup_logging()
     print("--- Mail Commander (Secure Multi-Server Mode) ---")
     
@@ -301,12 +345,12 @@ def interactive_mode(server_keys, reply_cipher):
             if not server_keys:
                 print("Cannot send command: No server public keys loaded.")
                 continue
-            send_command_email(server_keys)
+            send_command_email(server_keys, signing_key)
         elif action == 'sync':
             if not reply_cipher:
                  print("Cannot sync replies: Client private key not loaded.")
                  continue
-            sync_replies(reply_cipher)
+            sync_replies(reply_cipher, server_keys)
         elif action == 'read':
             view_logs_paginated()
         elif action == 'quit':
@@ -316,16 +360,19 @@ def interactive_mode(server_keys, reply_cipher):
 
 if __name__ == "__main__":
     if not all([USERNAME, PASSWORD, SMTP_SERVER, IMAP_SERVER, CLIENT_NUMBER]):
-        print("Error: Ensure .env file has EMAIL_USERNAME, EMAIL_PASSWORD, SMTP_SERVER, IMAP_SERVER, and CLIENT_NUMBER.")
+        print("Error: Ensure .env file has all required client variables.")
     else:
         server_keys = load_server_public_keys()
         
         reply_rsa_cipher = None
+        signing_key = None
         try:
             private_key = RSA.import_key(open(CLIENT_PRIVATE_KEY_PATH).read())
             reply_rsa_cipher = PKCS1_OAEP.new(private_key)
+            signing_key = pkcs1_15.new(private_key)
             print(f"Client private key loaded from {CLIENT_PRIVATE_KEY_PATH}.")
         except FileNotFoundError:
-            print(f"WARNING: Client private key not found at '{CLIENT_PRIVATE_KEY_PATH}'. Cannot decrypt replies.")
+            print(f"FATAL ERROR: Client private key not found at '{CLIENT_PRIVATE_KEY_PATH}'.")
+            exit()
 
-        interactive_mode(server_keys, reply_rsa_cipher)
+        interactive_mode(server_keys, reply_rsa_cipher, signing_key)
