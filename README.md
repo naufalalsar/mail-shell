@@ -102,7 +102,7 @@ The interactive client provides a simple menu:
 
 ## The Unencrypted Version
 
-    ⚠️ Security Warning: This project also includes separate, unencrypted versions of the client and server scripts. These are provided strictly for educational and testing purposes. They are fundamentally insecure and should NEVER be used in a real-world environment, as they transmit executable commands in plaintext.
+⚠️ Security Warning: This project also includes separate, unencrypted versions of the client and server scripts. These are provided strictly for educational and testing purposes. They are fundamentally insecure and should NEVER be used in a real-world environment, as they transmit executable commands in plaintext.
 
 ## Roadmap & Future Work
 
