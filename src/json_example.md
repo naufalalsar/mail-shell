@@ -10,7 +10,7 @@ Example encrypted command :
   "ciphertext": "..."
 }
 
-Decrpyed :
+Decrypted :
 
 {
   "command": "dir",
@@ -32,7 +32,7 @@ Example encrypted reply :
   "ciphertext": "..."
 }
 
-Decrpyed :
+Decrypted :
 
 {
   "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
