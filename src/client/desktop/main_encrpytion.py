@@ -107,7 +107,9 @@ def send_command_email(server_keys, signing_key):
     inner_command_data = {
         "command": command,
         "time_sent": datetime.now().isoformat(),
-        "client_number": int(CLIENT_NUMBER)
+        "client_number": int(CLIENT_NUMBER),
+        "server_number": server_id,
+        "uuid": command_uuid
     }
 
     print("Encrypting command payload...")

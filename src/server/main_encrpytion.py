@@ -100,7 +100,8 @@ def send_reply_email(original_data, command_output, rsa_cipher, signing_key):
         inner_reply_data = {
             "uuid": command_uuid, "command": original_data.get("command"),
             "time_sent": original_data.get("time_sent"), "command_reply": command_output,
-            "server_number": int(SERVER_NUMBER), "time_replied": datetime.now().isoformat()
+            "server_number": int(SERVER_NUMBER), "time_replied": datetime.now().isoformat(),
+            "client_number": original_data.get("client_number")
         }
         
         log_command_activity(command_uuid, "Encrypting reply...")
