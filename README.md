@@ -82,11 +82,11 @@ All of the code can be accessed on src folder.
 
     On the server machine, navigate into the server directory and run:
 
-    `python main_encrpytion.py`
+    `python main.py`
 
     On the client machine, navigate into the client directory and run:
 
-    `python main_encrpytion.py`
+    `python main.py`
 
 ## Client Usage
 
@@ -111,3 +111,5 @@ Future versions could include:
     Command Whitelisting: A server-side configuration to restrict which commands are allowed to be executed.
 
     Android Support: A dedicated client app for managing servers from a mobile device.
+
+    Other ESP Support: Currently only Gmail have been tested.
